@@ -4,6 +4,7 @@ import { Scanner } from './core/scanner';
 import { TimeResolver } from './core/time-resolver';
 import { ArchivePlanner, ArchiveExecutor } from './core/archiver';
 import { ArchiveModal } from './ui/archive-modal';
+import { TextWrapperModal } from './ui/text-wrapper-modal';
 
 export default class AssistantPlugin extends Plugin {
     settings!: ArchiveSettings;
@@ -38,6 +39,14 @@ export default class AssistantPlugin extends Plugin {
                     this.executor,
                     async () => this.saveSettings()
                 ).open();
+            }
+        });
+
+        this.addCommand({
+            id: 'ob-link-wrapper',
+            name: 'ob-link-wrapper',
+            callback: () => {
+                new TextWrapperModal(this.app).open();
             }
         });
     }

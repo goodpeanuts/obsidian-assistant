@@ -1,10 +1,17 @@
 # Obsidian Assistant
 
 Obsidian Assistant archives markdown notes into monthly folders (format: `YYYY-MM`) based on a configurable frontmatter timestamp.
+It also includes a clipboard-based Obsidian link wrapping tool.
 
 ## Features
 
 - Archive command: `Archive notes by created time`.
+- Clipboard wrapping command: `ob-link-wrapper`.
+  - Opens a modal and automatically reads clipboard text on open.
+  - Converts each non-empty line to `- [[line]]`.
+  - Copies processed output back to clipboard automatically.
+  - Supports fallback to Electron clipboard when browser clipboard API is blocked.
+  - Supports manual fallback flow: paste into input and click `Process Input`.
 - Multi-source scanning:
   - Add multiple source folders.
   - Configure each source folder to scan current folder only or include subfolders.
@@ -84,9 +91,10 @@ Local build output:
 ### Release deployment
 
 1. Update `manifest.json` version.
-2. Update `versions.json` with the same version and minimum app version.
-3. Create and push tag `vX.Y.Z`.
-4. GitHub Actions publishes release assets (`main.js`, `manifest.json`, `styles.css`, `versions.json`, and zip package).
+2. Update `package.json` version.
+3. Update `versions.json` with the same version and minimum app version.
+4. Create and push tag `vX.Y.Z`.
+5. GitHub Actions publishes release assets (`main.js`, `manifest.json`, `styles.css`, `versions.json`, and zip package).
 
 ## Project Structure
 
@@ -96,6 +104,7 @@ Local build output:
 - `core/time-resolver.ts`: frontmatter datetime extraction, parsing, and validation with error reasons.
 - `core/archiver.ts`: destination planning and safe file move execution.
 - `ui/archive-modal.ts`: archive preview modal and batch archive action.
+- `ui/text-wrapper-modal.ts`: clipboard-based text-to-Obsidian-link wrapper modal.
 - `scripts/build-local.mjs`: creates `.build/obsidian-assistant` artifacts.
 - `scripts/install-local.mjs`: installs local build into target vault plugin directory.
 - `manifest.json`: Obsidian plugin metadata.
