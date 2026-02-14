@@ -1,63 +1,103 @@
 # Obsidian Assistant
 
-Archive notes into `YY-MM` folders based on note creation time.
+Obsidian Assistant archives markdown notes into monthly folders (format: `YYYY-MM`) based on a configurable frontmatter timestamp.
 
-## Repository layout
+## Features
 
-- `main.ts`: plugin entrypoint.
-- `core/`: scan, time resolve, and archive planning/execution.
-- `ui/`: archive selection modal.
-- `manifest.json`: plugin metadata.
-- `versions.json`: plugin version -> minimum Obsidian version mapping.
-- `main.js` and `styles.css`: release artifacts required by Obsidian.
+- Archive command: `Archive notes by created time`.
+- Multi-source scanning:
+  - Add multiple source folders.
+  - Configure each source folder to scan current folder only or include subfolders.
+- Configurable target root:
+  - Archived notes are moved to `<targetRoot>/<YYYY-MM>/`.
+  - Month/year folder naming uses UTC components for timezone-stable classification.
+- Configurable timestamp key:
+  - Default frontmatter key is `createdTime`.
+  - Supported parsing includes `YYYY-MM-DD`, `YYYY-MM-DD HH:mm:ss`, and ISO-like datetime strings.
+- Archive preview modal:
+  - Shows archive candidates and destination path.
+  - Explains why a note is not archivable (missing/invalid frontmatter).
+  - `Select All` / `Deselect All`.
+  - Per-note `Ignore` action.
+- Auto-selection by age:
+  - Auto-select notes older than X days before running archive.
+- Ignore list management:
+  - Add/remove ignored markdown files from settings.
+  - Bulk edit ignored files (one path per line).
+- Conflict-safe file move:
+  - If target file exists, plugin renames with numeric suffix (`name (1).md`, etc.).
 
-## Development
+## Installation
+
+### 1) Install from release assets (recommended)
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from a release.
+2. Create plugin directory: `<Vault>/.obsidian/plugins/obsidian-assistant`.
+3. Copy the three files into that directory.
+4. Restart Obsidian and enable **Obsidian Assistant** in Community Plugins.
+
+### 2) Install local development build
+
+```bash
+npm install
+npm run install:local
+```
+
+Before running `install:local`, set your vault path:
+
+```powershell
+$env:OBSIDIAN_VAULT="D:\YourVault"
+npm run install:local
+```
+
+This command builds the plugin and copies artifacts to:
+`<Vault>/.obsidian/plugins/obsidian-assistant`.
+
+## Development and Deployment
+
+### Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-`npm run dev` starts esbuild watch mode and rebuilds `main.js`.
+- `npm run dev`: watch mode build for `main.js`.
+- Reload plugin in Obsidian after changes.
 
-Build once:
+### Build commands
 
 ```bash
 npm run build
-```
-
-Build local test artifacts (all files needed by Obsidian):
-
-```bash
 npm run build:local
 ```
 
-Output directory:
+- `npm run build`: TypeScript check (`tsc -noEmit`) + production bundle.
+- `npm run build:local`: build and copy release-required files to `.build/obsidian-assistant`.
+
+Local build output:
 
 - `.build/obsidian-assistant/main.js`
 - `.build/obsidian-assistant/manifest.json`
 - `.build/obsidian-assistant/styles.css`
 
-## Install manually (from release files)
-
-1. Create folder: `<Vault>/.obsidian/plugins/obsidian-assistant`
-2. Copy `main.js`, `manifest.json`, `styles.css` into that folder.
-3. Restart Obsidian and enable **Obsidian Assistant** in Community Plugins.
-
-Or install directly with one command:
-
-```bash
-$env:OBSIDIAN_VAULT="D:\YourVault"; npm run install:local
-```
-
-## Release process
+### Release deployment
 
 1. Update `manifest.json` version.
-2. Add the same version to `versions.json`.
-3. Create and push a tag: `vX.Y.Z`.
-4. GitHub Actions publishes release assets:
-   - `main.js`
-   - `manifest.json`
-   - `styles.css`
-   - `versions.json`
-   - `obsidian-assistant-X.Y.Z.zip`
+2. Update `versions.json` with the same version and minimum app version.
+3. Create and push tag `vX.Y.Z`.
+4. GitHub Actions publishes release assets (`main.js`, `manifest.json`, `styles.css`, `versions.json`, and zip package).
+
+## Project Structure
+
+- `main.ts`: plugin entrypoint, command registration, and module wiring.
+- `settings.ts`: settings model, default values, migration logic, and settings tab UI.
+- `core/scanner.ts`: source folder scanning with per-folder recursion and ignore filtering.
+- `core/time-resolver.ts`: frontmatter datetime extraction, parsing, and validation with error reasons.
+- `core/archiver.ts`: destination planning and safe file move execution.
+- `ui/archive-modal.ts`: archive preview modal and batch archive action.
+- `scripts/build-local.mjs`: creates `.build/obsidian-assistant` artifacts.
+- `scripts/install-local.mjs`: installs local build into target vault plugin directory.
+- `manifest.json`: Obsidian plugin metadata.
+- `versions.json`: plugin version compatibility map.
+- `main.js`, `styles.css`: runtime artifacts consumed by Obsidian.

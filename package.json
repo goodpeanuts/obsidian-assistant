@@ -1,6 +1,6 @@
 {
   "name": "obsidian-assistant",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Archive your notes by creation time.",
   "main": "main.js",
   "scripts": {
