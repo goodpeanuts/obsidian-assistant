@@ -17,10 +17,9 @@ export class ArchivePlanner {
 
         const year = date.getUTCFullYear();
         const month = date.getUTCMonth() + 1;
-        const yearShort = year.toString().slice(-2);
         const monthPad = month.toString().padStart(2, '0');
 
-        const folderName = `${yearShort}-${monthPad}`;
+        const folderName = `${year}-${monthPad}`;
         const targetFolder = `${this.settings.targetRoot}/${folderName}`;
 
         return normalizePath(`${targetFolder}/${file.name}`);
