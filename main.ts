@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { AssistantSettingTab, ArchiveSettings, DEFAULT_SETTINGS } from './settings';
+import { AssistantSettingTab, ArchiveSettings, SourceFolderConfig, DEFAULT_SETTINGS } from './settings';
 import { Scanner } from './core/scanner';
 import { TimeResolver } from './core/time-resolver';
 import { ArchivePlanner, ArchiveExecutor } from './core/archiver';
@@ -35,14 +35,31 @@ export default class AssistantPlugin extends Plugin {
                     this.scanner,
                     this.timeResolver,
                     this.planner,
-                    this.executor
+                    this.executor,
+                    async () => this.saveSettings()
                 ).open();
             }
         });
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const loadedData = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
+        
+        // Migrate old string[] format to SourceFolderConfig[] format
+        if (this.settings.sourceFolders && this.settings.sourceFolders.length > 0) {
+            const firstFolder = this.settings.sourceFolders[0];
+            if (typeof firstFolder === 'string') {
+                // Old format detected, migrate to new format
+                const oldFolders = this.settings.sourceFolders as unknown as string[];
+                const includeSubfolders = (loadedData as any).includeSubfolders ?? true;
+                this.settings.sourceFolders = oldFolders.map(path => ({
+                    path,
+                    includeSubfolders
+                }));
+                await this.saveSettings();
+            }
+        }
     }
 
     async saveSettings() {

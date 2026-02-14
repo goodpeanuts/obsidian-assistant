@@ -1,49 +1,68 @@
-import { TFile, FrontMatterCache } from 'obsidian';
+import { TFile } from 'obsidian';
 import { ArchiveSettings } from '../settings';
+
+export interface CreatedTimeResolution {
+    date: Date | null;
+    error: string | null;
+}
 
 export class TimeResolver {
     constructor(private settings: ArchiveSettings, private app: any) { }
 
     resolveCreatedTime(file: TFile): Date | null {
-        // Priority 1: Frontmatter
-        const frontmatterDate = this.getFromFrontmatter(file);
-        if (frontmatterDate) return frontmatterDate;
-
-        // Priority 2: Filename (e.g., 2023-10-25 Note.md or 202310251230.md)
-        // Basic regex for YYYY-MM-DD
-        const filenameDate = this.getFromFilename(file.name);
-        if (filenameDate) return filenameDate;
-
-        // Priority 3: File Stats (ctime)
-        return new Date(file.stat.ctime);
+        return this.resolveCreatedTimeWithError(file).date;
     }
 
-    private getFromFrontmatter(file: TFile): Date | null {
+    resolveCreatedTimeWithError(file: TFile): CreatedTimeResolution {
+        const key = this.settings.frontmatterKey || 'createdTime';
         const metadata = this.app.metadataCache.getFileCache(file);
         const frontmatter = metadata?.frontmatter;
-        if (!frontmatter) return null;
-
-        const key = this.settings.frontmatterKey;
-        const val = frontmatter[key];
-
-        if (val) {
-            const date = new Date(val);
-            if (!isNaN(date.getTime())) {
-                return date;
-            }
+        if (!frontmatter) {
+            return { date: null, error: 'Missing frontmatter.' };
         }
-        return null;
+
+        const value = frontmatter[key];
+        if (value === undefined || value === null || `${value}`.trim().length === 0) {
+            return { date: null, error: `Missing ${key}.` };
+        }
+
+        const parsed = this.parseCreatedTime(value);
+        if (!parsed) {
+            return { date: null, error: `Invalid ${key}: ${value}` };
+        }
+
+        return { date: parsed, error: null };
     }
 
-    private getFromFilename(filename: string): Date | null {
-        // Matches YYYY-MM-DD at start or inside
-        const match = filename.match(/(\d{4})-(\d{2})-(\d{2})/);
+    private parseCreatedTime(value: unknown): Date | null {
+        const raw = typeof value === 'string' ? value.trim() : `${value}`.trim();
+        if (!raw) return null;
+
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
         if (match) {
-            const date = new Date(`${match[1]}-${match[2]}-${match[3]}`);
-            if (!isNaN(date.getTime())) {
+            const year = Number(match[1]);
+            const month = Number(match[2]);
+            const day = Number(match[3]);
+            const hour = Number(match[4] ?? 0);
+            const minute = Number(match[5] ?? 0);
+            const second = Number(match[6] ?? 0);
+            const date = new Date(year, month - 1, day, hour, minute, second);
+
+            if (
+                date.getFullYear() === year &&
+                date.getMonth() === month - 1 &&
+                date.getDate() === day &&
+                date.getHours() === hour &&
+                date.getMinutes() === minute &&
+                date.getSeconds() === second
+            ) {
                 return date;
             }
+
+            return null;
         }
-        return null;
+
+        const fallback = new Date(raw);
+        return Number.isNaN(fallback.getTime()) ? null : fallback;
     }
 }

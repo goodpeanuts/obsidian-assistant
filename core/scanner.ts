@@ -8,22 +8,25 @@ export class Scanner {
         const files: TFile[] = [];
         const sourceFolders = this.settings.sourceFolders;
 
-        for (const folderPath of sourceFolders) {
-            const folder = this.app.vault.getAbstractFileByPath(folderPath);
+        for (const folderConfig of sourceFolders) {
+            const folder = this.app.vault.getAbstractFileByPath(folderConfig.path);
             if (folder instanceof TFolder) {
-                this.scanFolder(folder, files);
+                this.scanFolder(folder, files, folderConfig.includeSubfolders);
             }
         }
 
         return files;
     }
 
-    private scanFolder(folder: TFolder, files: TFile[]) {
+    private scanFolder(folder: TFolder, files: TFile[], includeSubfolders: boolean) {
+        const ignored = new Set(this.settings.ignoredFilePaths || []);
         for (const child of folder.children) {
             if (child instanceof TFile && child.extension === 'md') {
-                files.push(child);
-            } else if (child instanceof TFolder && this.settings.includeSubfolders) {
-                this.scanFolder(child, files);
+                if (!ignored.has(child.path)) {
+                    files.push(child);
+                }
+            } else if (child instanceof TFolder && includeSubfolders) {
+                this.scanFolder(child, files, includeSubfolders);
             }
         }
     }

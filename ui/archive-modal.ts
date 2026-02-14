@@ -6,8 +6,10 @@ import { ArchiveSettings } from '../settings';
 
 interface ArchiveCandidate {
     file: TFile;
-    targetPath: string;
+    targetPath: string | null;
     selected: boolean;
+    selectable: boolean;
+    invalidReason?: string;
 }
 
 export class ArchiveModal extends Modal {
@@ -19,7 +21,8 @@ export class ArchiveModal extends Modal {
         private scanner: Scanner,
         private timeResolver: TimeResolver,
         private planner: ArchivePlanner,
-        private executor: ArchiveExecutor
+        private executor: ArchiveExecutor,
+        private persistSettings: () => Promise<void>
     ) {
         super(app);
     }
@@ -33,17 +36,36 @@ export class ArchiveModal extends Modal {
         this.candidates = [];
 
         for (const file of files) {
+            const createdTime = this.timeResolver.resolveCreatedTimeWithError(file);
             const destination = this.planner.getDestinationPath(file);
+
             if (destination) {
+                const autoSelected = createdTime.date ? this.shouldAutoSelect(createdTime.date) : false;
                 this.candidates.push({
                     file,
                     targetPath: destination,
-                    selected: true // Default select all
+                    selected: autoSelected,
+                    selectable: true
+                });
+            } else {
+                this.candidates.push({
+                    file,
+                    targetPath: null,
+                    selected: false,
+                    selectable: false,
+                    invalidReason: createdTime.error ?? 'Invalid createdTime'
                 });
             }
         }
 
         this.display();
+    }
+
+    private shouldAutoSelect(createdTime: Date): boolean {
+        const thresholdDays = Math.max(0, this.settings.autoSelectOlderThanDays ?? 0);
+        const ageMs = Date.now() - createdTime.getTime();
+        const thresholdMs = thresholdDays * 24 * 60 * 60 * 1000;
+        return ageMs >= thresholdMs;
     }
 
     display() {
@@ -52,16 +74,13 @@ export class ArchiveModal extends Modal {
 
         contentEl.createEl('h2', { text: 'Archive Notes' });
 
-        // Control bar
         const controls = contentEl.createDiv({ cls: 'archive-controls' });
-
-        // Add minimal styling for controls if needed, but standard buttons work.
 
         new Setting(controls)
             .addButton(btn => btn
                 .setButtonText('Select All')
                 .onClick(() => {
-                    this.candidates.forEach(c => c.selected = true);
+                    this.candidates.forEach(c => c.selected = c.selectable);
                     this.display();
                 }))
             .addButton(btn => btn
@@ -71,7 +90,6 @@ export class ArchiveModal extends Modal {
                     this.display();
                 }));
 
-        // List
         const listContainer = contentEl.createDiv({ cls: 'archive-list' });
         listContainer.style.maxHeight = '400px';
         listContainer.style.overflowY = 'auto';
@@ -85,22 +103,33 @@ export class ArchiveModal extends Modal {
                 item.style.alignItems = 'center';
                 item.style.marginBottom = '5px';
 
-                // Checkbox
                 const cb = item.createEl('input', { type: 'checkbox' });
                 cb.checked = candidate.selected;
+                cb.disabled = !candidate.selectable;
                 cb.onclick = () => {
                     candidate.selected = cb.checked;
                 };
 
-                // Text info
                 const info = item.createDiv({ cls: 'archive-info' });
                 info.style.marginLeft = '10px';
                 info.createDiv({ text: candidate.file.basename, cls: 'archive-filename' }).style.fontWeight = 'bold';
-                info.createDiv({ text: `→ ${candidate.targetPath}`, cls: 'archive-target' }).style.fontSize = '0.8em';
+
+                if (candidate.targetPath) {
+                    info.createDiv({ text: `-> ${candidate.targetPath}`, cls: 'archive-target' }).style.fontSize = '0.8em';
+                } else {
+                    const reasonEl = info.createDiv({ text: `Cannot archive: ${candidate.invalidReason ?? 'Invalid createdTime'}`, cls: 'archive-target' });
+                    reasonEl.style.fontSize = '0.8em';
+                    reasonEl.style.color = 'var(--text-muted)';
+                }
+
+                const ignoreBtn = item.createEl('button', { text: 'Ignore' });
+                ignoreBtn.style.marginLeft = 'auto';
+                ignoreBtn.onclick = async () => {
+                    await this.addFileToIgnoreList(candidate.file);
+                };
             });
         }
 
-        // Footer Actions
         const footer = contentEl.createDiv({ cls: 'archive-footer' });
         footer.style.marginTop = '20px';
         footer.style.display = 'flex';
@@ -111,7 +140,7 @@ export class ArchiveModal extends Modal {
                 .setButtonText('Cancel')
                 .onClick(() => this.close()))
             .addButton(btn => btn
-                .setButtonText(`Archive Selected (${this.candidates.filter(c => c.selected).length})`)
+                .setButtonText('Archive Selected')
                 .setCta()
                 .onClick(async () => {
                     await this.executeArchive();
@@ -119,7 +148,7 @@ export class ArchiveModal extends Modal {
     }
 
     async executeArchive() {
-        const selected = this.candidates.filter(c => c.selected);
+        const selected = this.candidates.filter((c): c is ArchiveCandidate & { targetPath: string } => c.selected && c.selectable && !!c.targetPath);
         if (selected.length === 0) {
             new Notice('No files selected.');
             return;
@@ -140,6 +169,16 @@ export class ArchiveModal extends Modal {
         }
 
         new Notice(`Successfully archived ${successCount} files.`);
+    }
+
+    private async addFileToIgnoreList(file: TFile) {
+        if (!this.settings.ignoredFilePaths.includes(file.path)) {
+            this.settings.ignoredFilePaths.push(file.path);
+            await this.persistSettings();
+        }
+        this.candidates = this.candidates.filter(candidate => candidate.file.path !== file.path);
+        this.display();
+        new Notice(`Ignored: ${file.path}`);
     }
 
     onClose() {
