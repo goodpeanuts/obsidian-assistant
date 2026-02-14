@@ -1,0 +1,10 @@
+{
+    "id": "obsidian-assistant",
+    "name": "Obsidian Assistant",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "Automatically archive notes by creation time.",
+    "author": "Antigravity",
+    "authorUrl": "https://github.com/obsidian-kit/obsidian-assistant",
+    "isDesktopOnly": false
+}
